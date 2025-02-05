@@ -65,6 +65,8 @@ You can now define libraries of functions alongside your infrastructure code.
    user_message = provider::func::strincludes("Hello, world!", "world") ? "This is cool" : "Not so much"
    ```
 
+The func provider will look up for all environment variables that have the `FUNC_` prefix and will use them to auto-configure itself. You can add any number of sources you would like using the environment variables, by simply changing the `ID` value in the variable name (e.g. `FUNC_LIBRARY_0001_SOURCE`, `FUNC_LIBRARY_0002_SOURCE`). Those IDs are not neither stored nor used internally, so you can name them anything you like. Their only purpose is to differentiate between sources. Keep in mind that the order of their parsing is not defined by the func provider, so try to avoid overriding functions.
+
 ### Remote libraries
 
 The func provider integrates with go-getter, so you can fetch your libraries at runtime from any remote source, using the exact same sources you will provide for your modules.
