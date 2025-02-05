@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"terraform-provider-func/internal/functions"
+
+	"terraform-provider-func/internal/javascript"
+	"terraform-provider-func/internal/runtime"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
@@ -29,7 +31,7 @@ var _ provider.ProviderWithEphemeralResources = &FuncProvider{}
 // FuncProvider defines the provider implementation.
 type FuncProvider struct {
 	version string
-	parser  *functions.Parser
+	vms     map[string]runtime.Runtime
 }
 
 // FuncProviderModel describes the provider data model.
@@ -89,7 +91,21 @@ func (p *FuncProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 			return
 		}
 
-		p.parser.Parse(string(content))
+		// TODO: Based on the file extension OR static input, determine the runtime
+		vmKey := "js"
+		vm, ok := p.vms[vmKey]
+		if !ok {
+			resp.Diagnostics.AddError(
+				"cannot parse library",
+				fmt.Errorf("cannot parse %s (key %s), no parser implementation for it", lib.File.String(), vmKey).Error(),
+			)
+			return
+		}
+
+		if err := vm.Parse(string(content)); err != nil {
+			resp.Diagnostics.AddError("library parsing failed", err.Error())
+			return
+		}
 	}
 }
 
@@ -106,36 +122,54 @@ func (p *FuncProvider) DataSources(ctx context.Context) []func() datasource.Data
 }
 
 func (p *FuncProvider) Functions(ctx context.Context) []func() function.Function {
-	return slice.Map[functions.JSFunction, func() function.Function](
-		p.parser.GetFunctions(),
-		func(f functions.JSFunction) func() function.Function {
+	funcs := make([]runtime.Function, 0)
+
+	for _, runtime := range p.vms {
+		funcs = append(funcs, runtime.Functions()...)
+	}
+
+	return slice.Map[runtime.Function, func() function.Function](
+		funcs,
+		func(f runtime.Function) func() function.Function {
 			return func() function.Function {
-				return f
+				return runtime.TerraformFunction{Function: f}
 			}
 		},
 	)
 }
 
 func New(version string) func() provider.Provider {
-	parser := functions.New()
+	vms := map[string]runtime.Runtime{
+		"js": javascript.New(),
+		// "go": golang.New(),
+	}
 
 	for _, v := range os.Environ() {
 		if strings.HasPrefix(v, "TF_PROVIDER_FUNC_LIBRARY") {
 			file := strings.SplitN(v, "=", 2)
 			content, err := os.ReadFile(file[1])
 			if err != nil {
-				tflog.Error(context.TODO(), fmt.Sprintf("ignored file %v: %w", file, err))
+				tflog.Error(context.TODO(), fmt.Sprintf("ignored file %v: %v", file, err))
 				continue
 			}
 
-			parser.Parse(string(content))
+			// TODO: Based on the file extension OR static input, determine the runtime
+			vmKey := "js"
+			vm, ok := vms[vmKey]
+			if !ok {
+				panic(fmt.Errorf("cannot parse %s (key %s), no parser implementation for it", file[1], vmKey))
+			}
+
+			if err := vm.Parse(string(content)); err != nil {
+				panic(err)
+			}
 		}
 	}
 
 	return func() provider.Provider {
 		return &FuncProvider{
 			version: version,
-			parser:  parser,
+			vms:     vms,
 		}
 	}
 }
