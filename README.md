@@ -1,18 +1,81 @@
 # Terraform Provider Func
 
-_This template repository is built on the [Terraform Plugin Framework](https://github.com/hashicorp/terraform-plugin-framework). The template repository built on the [Terraform Plugin SDK](https://github.com/hashicorp/terraform-plugin-sdk) can be found at [terraform-provider-scaffolding](https://github.com/hashicorp/terraform-provider-scaffolding). See [Which SDK Should I Use?](https://developer.hashicorp.com/terraform/plugin/framework-benefits) in the Terraform documentation for additional information._
+The **func** provider is a powerful and unique Terraform provider that enables you to define and execute custom functions. It seamlessly blends functional and declarative paradigms, unlocking new possibilities for managing infrastructure with greater flexibility and efficiency.
 
-This repository is a *template* for a [Terraform](https://www.terraform.io) provider. It is intended as a starting point for creating Terraform providers, containing:
+In essence, the **func** provider allows you to build functional libraries that integrate natively into your Terraform codebase. These libraries are evaluated at runtime, eliminating the need to develop an entire provider just to introduce a small piece of functionality. With **func**, you can extend Terraform dynamically, keeping your infrastructure code clean, modular, and adaptable.
 
-- A resource and a data source (`internal/provider/`),
-- Examples (`examples/`) and generated documentation (`docs/`),
-- Miscellaneous meta files.
+## Proof of concept
 
-These files contain boilerplate code that you will need to edit to create your own Terraform provider. Tutorials for creating Terraform providers can be found on the [HashiCorp Developer](https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework) platform. _Terraform Plugin Framework specific guides are titled accordingly._
+For now, the provider is still in the state of the art phase.
 
-Please see the [GitHub template repository documentation](https://help.github.com/en/github/creating-cloning-and-archiving-repositories/creating-a-repository-from-a-template) for how to create a new repository from this template on GitHub.
+Features that are still work in progress:
+- [x] Dynamic functions generation;
+- [x] JavaScript support (via goja);
+- [ ] Getter integration;
+- [ ] Plain JavaScript support;
+- [ ] JSDoc integration;
+- [ ] GoLang support;
+- [ ] Provider configuration;
+- [ ] Terraform <1.8 support via data-sources.
 
-Once you've written your provider, you'll want to [publish it on the Terraform Registry](https://developer.hashicorp.com/terraform/registry/providers/publishing) so that others can use it.
+## Features
+
+### Libraries alongside codebase
+
+You can now define libraries of functions alongside your infrastructure code.
+
+1. Create a new JavaScript file `lib.js`.
+2. Place it right next to your Terraform files. 
+3. Open it and write and export your own function:
+   ```javascript
+    /**
+     * Check if a string includes a substring.
+     * 
+     * This function checks if a given substring is part of a string.
+     * @param {string} s the string
+     * @param {string} sub the substring
+     * @returns {boolean} whether the string contains the substring or not
+     */
+    export function strincludes(s, sub) {
+      return s.includes(sub);
+    }
+    ```
+4. Configure the provider:
+    ```hcl
+    terraform {
+      required_providers {
+        func = {
+          source = "valentindeaconu/func"
+        }
+      }
+    }
+
+    # This is not yet supported by Terraform.
+    # You can achieve this by setting the  environment variable.
+    provider "func" {
+      # You can either declare the library as code here,
+      # or set it via an environment variable: FUNC_LIBRARY_{ID}_SOURCE="file:///abs/path/to/the/lib.js"
+      library {
+        source = "file://${path.module}/lib.js"
+      }
+    }
+    ```
+5. Use the function:
+   ```hcl
+   user_message = provider::func::strincludes("Hello, world!", "world") ? "This is cool" : "Not so much"
+   ```
+
+### Remote libraries
+
+The func provider integrates with go-getter, so you can fetch your libraries at runtime from any remote source, using the exact same sources you will provide for your modules.
+
+### Terraform Language-server support
+
+By annotating your functions with JSDoc descriptions, the func provider will gather those comments and communicate them to the language-server, so you can see what you are doing directly from your IDE.
+
+### Multiple runtimes
+
+Depending on your library file extension, you can either use JavaScript or GoLang (planned) to declare your functions. The provider will handle the interpretation under the hood. 
 
 ## Requirements
 
@@ -29,23 +92,17 @@ Once you've written your provider, you'll want to [publish it on the Terraform R
 go install
 ```
 
-## Adding Dependencies
-
-This provider uses [Go modules](https://github.com/golang/go/wiki/Modules).
-Please see the Go documentation for the most up to date information about using Go modules.
-
-To add a new dependency `github.com/author/dependency` to your Terraform provider:
-
-```shell
-go get github.com/author/dependency
-go mod tidy
-```
-
-Then commit the changes to `go.mod` and `go.sum`.
-
 ## Using the provider
 
-Fill this in for each provider
+```hcl
+terraform {
+  required_providers {
+    func = {
+      source = "valentindeaconu/func"
+    }
+  }
+}
+```
 
 ## Developing the Provider
 
