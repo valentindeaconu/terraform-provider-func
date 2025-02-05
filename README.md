@@ -12,8 +12,7 @@ Features - completed, work-in-progress or planned (in no specific order):
 - [x] Dynamic functions generation;
 - [x] JavaScript support (via goja);
 - [ ] Getter integration;
-- [ ] Plain JavaScript support;
-- [ ] JSDoc integration;
+- [x] JSDoc integration;
 - [ ] GoLang support;
 - [ ] Provider configuration;
 - [ ] Terraform <1.8 support via data-sources.
@@ -26,7 +25,7 @@ You can now define libraries of functions alongside your infrastructure code.
 
 1. Create a new JavaScript file `lib.js`.
 2. Place it right next to your Terraform files. 
-3. Open it and write and export your own function:
+3. Open it and write your own function:
    ```javascript
     /**
      * Check if a string includes a substring.
@@ -36,9 +35,9 @@ You can now define libraries of functions alongside your infrastructure code.
      * @param {string} sub the substring
      * @returns {boolean} whether the string contains the substring or not
      */
-    export function strincludes(s, sub) {
+    $(function string_includes(s, sub) {
       return s.includes(sub);
-    }
+    })
     ```
 4. Configure the provider:
     ```hcl
@@ -62,7 +61,7 @@ You can now define libraries of functions alongside your infrastructure code.
     ```
 5. Use the function:
    ```hcl
-   user_message = provider::func::strincludes("Hello, world!", "world") ? "This is cool" : "Not so much"
+   user_message = provider::func::string_includes("Hello, world!", "world") ? "This is cool" : "Not so much"
    ```
 
 The func provider will look up for all environment variables that have the `FUNC_` prefix and will use them to auto-configure itself. You can add any number of sources you would like using the environment variables, by simply changing the `ID` value in the variable name (e.g. `FUNC_LIBRARY_0001_SOURCE`, `FUNC_LIBRARY_0002_SOURCE`). Those IDs are not neither stored nor used internally, so you can name them anything you like. Their only purpose is to differentiate between sources. Keep in mind that the order of their parsing is not defined by the func provider, so try to avoid overriding functions.
