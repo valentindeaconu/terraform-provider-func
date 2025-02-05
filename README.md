@@ -8,7 +8,7 @@ In essence, the **func** provider allows you to build functional libraries that 
 
 For now, the provider is still in the state of the art phase.
 
-Features that are still work in progress:
+Features - completed, work-in-progress or planned (in no specific order):
 - [x] Dynamic functions generation;
 - [x] JavaScript support (via goja);
 - [ ] Getter integration;
