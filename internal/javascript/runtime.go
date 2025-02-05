@@ -1,190 +1,161 @@
 package javascript
 
 import (
-	_ "embed"
 	"fmt"
 	"regexp"
 	"strings"
 	"terraform-provider-func/internal/runtime"
 
 	"github.com/dop251/goja"
-	"github.com/ssoroka/slice"
+	"github.com/dop251/goja_nodejs/console"
+	"github.com/dop251/goja_nodejs/process"
+	"github.com/dop251/goja_nodejs/require"
 )
 
-//go:embed metadata.js
-var metadataScript string
+var (
+	argNamesRegEx = regexp.MustCompile(`\(([^)]*)\)`)
+)
 
 // JavaScriptRuntime is a concrete implementation of the Runtime interface
 // and manages a runtime for JavaScript using the goja project.
 type JavaScriptRuntime struct {
-	vm    *goja.Runtime
-	funcs []*JavaScriptFunction
+	vm           *goja.Runtime
+	funcMetadata map[string]*JavaScriptFunctionMetadata
+	funcs        map[string]*JavaScriptFunction
 }
 
 // New creates a new JavaScriptRuntime
 func New() runtime.Runtime {
 	vm := goja.New()
 
-	return &JavaScriptRuntime{
-		vm:    vm,
-		funcs: make([]*JavaScriptFunction, 0),
+	// Enable Node.js compatibility
+	_ = new(require.Registry).Enable(vm)
+	process.Enable(vm)
+	console.Enable(vm)
+
+	// Create the runti,e
+	runtime := &JavaScriptRuntime{
+		vm:           vm,
+		funcs:        make(map[string]*JavaScriptFunction, 0),
+		funcMetadata: make(map[string]*JavaScriptFunctionMetadata, 0),
 	}
+
+	// Define a global function `$` that registers functions
+	err := vm.Set("$", runtime.registerFn())
+	if err != nil {
+		panic(err)
+	}
+
+	return runtime
 }
 
 func (r *JavaScriptRuntime) Functions() []runtime.Function {
-	return slice.Map[*JavaScriptFunction, runtime.Function](
-		r.funcs,
-		func(fn *JavaScriptFunction) runtime.Function {
-			return fn
-		},
-	)
+	fns := make([]runtime.Function, 0, len(r.funcs))
+
+	for _, f := range r.funcs {
+		fns = append(fns, f)
+	}
+
+	return fns
 }
 
 func (r *JavaScriptRuntime) Parse(src string) error {
-	_, err := r.vm.RunString(fmt.Sprintf("%s\n\n\n%s", src, metadataScript))
+	metadata, err := parseScriptJSDoc(src)
 	if err != nil {
-		return fmt.Errorf("could not run user-defined script: %v", err)
+		return fmt.Errorf("cannot parse jsdoc: %w", err)
 	}
 
-	exports := r.vm.Get("__exports").ToObject(r.vm)
+	for k, v := range metadata {
+		r.funcMetadata[k] = v
+	}
 
-	for _, key := range exports.Keys() {
-		fn := exports.Get(key).ToObject(r.vm)
-
-		name := key
-
-		funcStr, err := r.getString(fn, "fnString", nil)
-		if err != nil {
-			return err
-		}
-
-		argNames, err := extractArgNames(funcStr)
-		if err != nil {
-			return fmt.Errorf("could no extract argument names from function %s: %w", key, err)
-		}
-
-		var rawArgsValue goja.Value
-		if err := r.vm.Try(func() { rawArgsValue = fn.Get("args") }); err != nil {
-			return fmt.Errorf("function %s is has an invalid 'args' declarations: %w", key, err)
-		}
-
-		var args []javaScriptArgumentInput = make([]javaScriptArgumentInput, len(argNames))
-		for i, argName := range argNames {
-			args[i].name = argName
-			args[i].jsType = "any"
-			args[i].description = ""
-		}
-
-		if rawArgsValue != nil {
-			exportedRawArgs := rawArgsValue.Export()
-			rawArgs, ok := exportedRawArgs.([]any)
-			if !ok {
-				return fmt.Errorf("function %s is has an invalid 'args' declarations: expecting array of args, but instead got %T", key, exportedRawArgs)
-			}
-
-			for i, rawArg := range rawArgs {
-				if arg, ok := rawArg.(map[string]any); ok {
-					if val, ok := arg["type"].(string); ok {
-						args[i].jsType = val
-					} else {
-						return fmt.Errorf("argument %d of function %s is missing the required 'type' declaration", i, key)
-					}
-
-					if val, ok := arg["description"].(string); ok {
-						args[i].description = val
-					}
-				} else {
-					return fmt.Errorf("could not parse argument %d of function %s", i, key)
-				}
-			}
-		}
-
-		returnType, err := r.getString(fn, "returns", strAsPtr("any"))
-		if err != nil {
-			return err
-		}
-
-		funcValue, err := r.getValue(fn, "fn", true)
-		if err != nil {
-			return err
-		}
-
-		callable, ok := goja.AssertFunction(funcValue)
-		if !ok {
-			return fmt.Errorf("library exported %v func, but the JSVM could not return its pointer", name)
-		}
-
-		summary, err := r.getString(fn, "summary", strAsPtr(""))
-		if err != nil {
-			return err
-		}
-
-		description, err := r.getString(fn, "description", strAsPtr(""))
-		if err != nil {
-			return err
-		}
-
-		f, err := NewJavaScriptFunction(&javascriptFunctionInput{
-			name:        name,
-			summary:     summary,
-			description: description,
-			args:        args,
-			retJsType:   returnType,
-			callable:    callable,
-		}, r.vm)
-		if err != nil {
-			return err
-		}
-
-		r.funcs = append(r.funcs, f)
+	if _, err := r.vm.RunString(src); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-// getValue returns an object field as a value.
-func (r *JavaScriptRuntime) getValue(obj *goja.Object, field string, required bool) (goja.Value, error) {
-	var val goja.Value
+func (r *JavaScriptRuntime) registerFn() func(goja.FunctionCall) goja.Value {
+	return func(call goja.FunctionCall) goja.Value {
+		fnRaw := call.Argument(0)
 
-	if err := r.vm.Try(func() {
-		val = obj.Get(field)
-	}); err != nil {
-		return nil, fmt.Errorf("unknown property '%s': %w", field, err)
+		if goja.IsUndefined(fnRaw) || goja.IsNull(fnRaw) {
+			panic(r.vm.ToValue("$() requires a function: received nothing"))
+		}
+
+		fn, ok := goja.AssertFunction(fnRaw)
+		if !ok {
+			panic(r.vm.ToValue("$() requires a function: did not receive a function"))
+		}
+
+		fnName := fnRaw.ToObject(r.vm).Get("name").String()
+		if fnName == "" {
+			panic(r.vm.ToValue("Registered function must have a name"))
+		}
+
+		fnStr := fnRaw.ToObject(r.vm).String()
+
+		f, err := r.parseFunction(fnName, fn, fnStr)
+		if err != nil {
+			panic(r.vm.ToValue(err))
+		}
+
+		r.funcs[fnName] = f
+
+		return goja.Undefined()
 	}
-
-	if required && val == nil {
-		return nil, fmt.Errorf("property '%s' is nil", field)
-	}
-
-	return val, nil
 }
 
-// getString returns an object field as a string.
-//
-// If the defaultValue is not set, the method considers the field si required
-// and returns an error if it cannot find the value.
-func (r *JavaScriptRuntime) getString(obj *goja.Object, field string, defaultValue *string) (string, error) {
-	val, err := r.getValue(obj, field, (defaultValue == nil))
+func (r *JavaScriptRuntime) parseFunction(name string, fn goja.Callable, fnStr string) (*JavaScriptFunction, error) {
+	fnSignature := strings.SplitN(fnStr, "\n", 2)
+	fnHash := removeWhitespaceFromString(fnSignature[0])
+
+	argNames, err := extractArgNames(fnStr)
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("could no extract argument names from function %s: %w", name, err)
 	}
 
-	if val != nil {
-		return val.String(), nil
+	summary := ""
+	description := ""
+
+	var args []javaScriptArgumentInput = make([]javaScriptArgumentInput, len(argNames))
+	for i, argName := range argNames {
+		args[i].name = argName
+		args[i].jsType = "any"
+		args[i].description = ""
 	}
 
-	return *defaultValue, nil
-}
+	returnType := "any"
 
-func strAsPtr(v string) *string {
-	return &v
+	metadata, ok := r.funcMetadata[fnHash]
+	if ok {
+		summary = metadata.summary
+		description = metadata.description
+
+		for i, param := range metadata.params {
+			args[i].name = param.name
+			args[i].description = param.description
+			args[i].jsType = param.typ
+		}
+
+		returnType = metadata.returns.typ
+	}
+
+	return NewJavaScriptFunction(&javascriptFunctionInput{
+		name:        name,
+		summary:     summary,
+		description: description,
+		args:        args,
+		retJsType:   returnType,
+		callable:    fn,
+	}, r.vm)
 }
 
 func extractArgNames(fnString string) ([]string, error) {
-	re := regexp.MustCompile(`\(([^)]*)\)`)
-	matches := re.FindStringSubmatch(fnString)
+	matches := argNamesRegEx.FindStringSubmatch(fnString)
 	if len(matches) < 2 {
-		return nil, fmt.Errorf("no arguments found in function string")
+		return nil, fmt.Errorf("no arguments found in function signature")
 	}
 
 	argNames := strings.Split(matches[1], ",")
