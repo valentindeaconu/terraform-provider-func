@@ -15,7 +15,7 @@ Features - completed, work-in-progress or planned (in no specific order):
 - [x] JSDoc integration;
 - [ ] GoLang support;
 - [ ] Provider configuration;
-- [ ] Terraform <1.8 support via data-sources.
+- [x] Terraform <1.8 support via data-sources.
 
 ## Features
 
@@ -77,6 +77,26 @@ By annotating your functions with JSDoc descriptions, the func provider will gat
 ### Multiple runtimes
 
 Depending on your library file extension, you can either use JavaScript or GoLang (planned) to declare your functions. The provider will handle the interpretation under the hood. 
+
+### Data sources
+
+If you are on a Terraform version lower than 1.8, don't worry - you can still use the func provider via data-sources!
+
+```hcl
+data "func" "sum_numbers" {
+  # The name of the function you want to use
+  id = "sum"
+
+  # Either a tuple with the inputs
+  inputs = [10, 32]
+
+  # Or, an object with named parameters
+  inputs = {
+    a = 10
+    b = 32
+  }
+}
+```
 
 ## Requirements
 
