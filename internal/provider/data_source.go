@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 	"terraform-provider-func/internal/runtime"
 	"terraform-provider-func/tftypes"
 	"terraform-provider-func/tftypes/tfconvert"
@@ -47,19 +48,27 @@ func (d *DataSource) Schema(ctx context.Context, req datasource.SchemaRequest, r
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description:         "The name of the function",
-				MarkdownDescription: "The name of the function",
+				Description:         "The name of the function.",
+				MarkdownDescription: "The name of the function.",
 				Required:            true,
 			},
 			"inputs": schema.DynamicAttribute{
-				Description:         "Inputs to be fed into the function.",
-				MarkdownDescription: "Inputs to be fed into the function.",
-				Required:            true,
-				Validators:          []validator.Dynamic{&InputsValidator{}},
+				Description: "Inputs to be fed into the function.",
+				MarkdownDescription: strings.Join(
+					[]string{
+						"Inputs to be fed into the function.",
+						"The inputs can either be a tuple (and the order matters! - equivalent of Python's `args`),",
+						"or an object with named parameters (the order doesn't matter - equivalent of Python's `kwargs`).",
+						"For any other type, the provider will throw an error.",
+					},
+					" ",
+				),
+				Required:   true,
+				Validators: []validator.Dynamic{&InputsValidator{}},
 			},
 			"result": schema.DynamicAttribute{
-				Description:         "The result of the function.",
-				MarkdownDescription: "The result of the function.",
+				Description:         "The result of the function. The type will be inferred from the function return type.",
+				MarkdownDescription: "The result of the function. The type will be inferred from the function return type.",
 				Computed:            true,
 			},
 		},

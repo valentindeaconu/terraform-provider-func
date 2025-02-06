@@ -41,7 +41,7 @@ type FuncProviderModel struct {
 
 // LibraryModel describes the library data model.
 type LibraryModel struct {
-	File types.String `tfsdk:"file"`
+	Source types.String `tfsdk:"source"`
 }
 
 func (p *FuncProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -51,16 +51,35 @@ func (p *FuncProvider) Metadata(ctx context.Context, req provider.MetadataReques
 
 func (p *FuncProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Description: "Bringing functional programming into Terraform.",
+		MarkdownDescription: strings.Join(
+			[]string{
+				"The **func** provider is a powerful and unique Terraform provider that enables you to define and execute custom functions.",
+				"It seamlessly blends functional and declarative paradigms, unlocking new possibilities for managing infrastructure with greater flexibility and efficiency.",
+				"\nThis provider allows you to define functions in an external, functional language and then use them in your Terraform codebase.",
+			},
+			" ",
+		),
 		Blocks: map[string]schema.Block{
 			"library": schema.ListNestedBlock{
 				MarkdownDescription: "Configuration for the functions library.",
 				Description:         "Configuration for the functions library.",
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
-						"file": schema.StringAttribute{
-							Description:         "Path to the JavaScript file.",
-							MarkdownDescription: "Path to the JavaScript file.",
-							Required:            true,
+						"source": schema.StringAttribute{
+							Description: "Source of the library file.",
+							MarkdownDescription: strings.Join(
+								[]string{
+									"Source of the library file.\n",
+									"The source of the library file can be any [getter](https://github.com/hashicorp/go-getter#url-format) accepted URL (similar to Terraform module's sources).",
+									"It can also be set via an environment variable like `FUNC_LIBRARY_{ID}_SOURCE`,",
+									"where the `{ID}` value can be replaced with anything.",
+									"The provider doesn't really care about this, as long as it is prefixed with the",
+									"`FUNC_LIBRARY_` prefix, it will be found and read accordingly.",
+								},
+								" ",
+							),
+							Required: true,
 						},
 					},
 				},
@@ -159,8 +178,10 @@ func New(version string) func() provider.Provider {
 	}
 
 	for _, v := range os.Environ() {
-		if strings.HasPrefix(v, "TF_PROVIDER_FUNC_LIBRARY") {
+		if strings.HasPrefix(v, "FUNC_LIBRARY_") && strings.HasSuffix(v, "_SOURCE") {
 			file := strings.SplitN(v, "=", 2)
+
+			// TODO: Implement getter support
 			content, err := os.ReadFile(file[1])
 			if err != nil {
 				tflog.Error(context.TODO(), fmt.Sprintf("ignored file %v: %v", file, err))
