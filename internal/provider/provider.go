@@ -70,43 +70,53 @@ func (p *FuncProvider) Schema(ctx context.Context, req provider.SchemaRequest, r
 }
 
 func (p *FuncProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	var data FuncProviderModel
-	var libs []LibraryModel = []LibraryModel{}
+	// var data FuncProviderModel
+	// var libs []LibraryModel = []LibraryModel{}
 
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-	resp.Diagnostics.Append(data.Library.ElementsAs(ctx, libs, false)...)
+	// resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	// resp.Diagnostics.Append(data.Library.ElementsAs(ctx, &libs, false)...)
 
-	if resp.Diagnostics.HasError() {
-		return
+	// if resp.Diagnostics.HasError() {
+	// 	return
+	// }
+
+	// resp.Diagnostics.AddWarning("found library files", fmt.Sprintf("%v %T", libs, libs))
+
+	// for _, lib := range libs {
+	// 	resp.Diagnostics.AddWarning("parsing library file", fmt.Sprintf("%v %T", lib, lib))
+
+	// 	content, err := os.ReadFile(lib.File.ValueString())
+	// 	if err != nil {
+	// 		resp.Diagnostics.AddError("could not read library file", err.Error())
+	// 		return
+	// 	}
+
+	// 	// TODO: Based on the file extension OR static input, determine the runtime
+	// 	vmKey := "js"
+	// 	vm, ok := p.vms[vmKey]
+	// 	if !ok {
+	// 		resp.Diagnostics.AddError(
+	// 			"cannot parse library",
+	// 			fmt.Errorf("cannot parse %s (key %s), no parser implementation for it", lib.File.String(), vmKey).Error(),
+	// 		)
+	// 		return
+	// 	}
+
+	// 	if err := vm.Parse(string(content)); err != nil {
+	// 		resp.Diagnostics.AddError("library parsing failed", err.Error())
+	// 		return
+	// 	}
+	// }
+
+	funcs := make(map[string]runtime.Function, 0)
+
+	for _, vm := range p.vms {
+		for _, f := range vm.Functions() {
+			funcs[f.Name()] = f
+		}
 	}
 
-	resp.Diagnostics.AddWarning("found library files", fmt.Sprintf("%v %T", libs, libs))
-
-	for _, lib := range libs {
-		resp.Diagnostics.AddWarning("parsing library file", fmt.Sprintf("%v %T", lib, lib))
-
-		content, err := os.ReadFile(lib.File.String())
-		if err != nil {
-			resp.Diagnostics.AddError("could not read library file", err.Error())
-			return
-		}
-
-		// TODO: Based on the file extension OR static input, determine the runtime
-		vmKey := "js"
-		vm, ok := p.vms[vmKey]
-		if !ok {
-			resp.Diagnostics.AddError(
-				"cannot parse library",
-				fmt.Errorf("cannot parse %s (key %s), no parser implementation for it", lib.File.String(), vmKey).Error(),
-			)
-			return
-		}
-
-		if err := vm.Parse(string(content)); err != nil {
-			resp.Diagnostics.AddError("library parsing failed", err.Error())
-			return
-		}
-	}
+	resp.DataSourceData = funcs
 }
 
 func (p *FuncProvider) Resources(ctx context.Context) []func() resource.Resource {
@@ -118,7 +128,11 @@ func (p *FuncProvider) EphemeralResources(ctx context.Context) []func() ephemera
 }
 
 func (p *FuncProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
+	return []func() datasource.DataSource{
+		func() datasource.DataSource {
+			return &DataSource{}
+		},
+	}
 }
 
 func (p *FuncProvider) Functions(ctx context.Context) []func() function.Function {
