@@ -187,7 +187,7 @@ func (v *objectConverter) Convert(ctx context.Context, typ attr.Type) (attr.Valu
 
 		return tftypes.DiagnosticsToError(basetypes.NewMapValue(cty, v.Attributes()))
 	default:
-		return nil, fmt.Errorf("could not object set into %v", typ.String())
+		return nil, fmt.Errorf("could not convert object into %v", typ.String())
 	}
 }
 
