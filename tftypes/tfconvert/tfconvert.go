@@ -20,14 +20,15 @@ type ConverterFrom interface {
 // Convert tries to convert a value to a given type
 func Convert(ctx context.Context, val attr.Value, typ attr.Type) (attr.Value, error) {
 	ty := val.Type(ctx)
+
 	// Same type, return the value
-	if ty.Equal(typ) {
+	if tftypes.TypeEqual(ty, typ) {
 		return val, nil
 	}
 
 	// Convert into dynamic type
 	// Create a dynamic value wrapping the current value
-	if (basetypes.DynamicType{}).Equal(typ) {
+	if tftypes.TypeEqual(basetypes.DynamicType{}, typ) {
 		return basetypes.NewDynamicValue(val), nil
 	}
 
@@ -201,7 +202,7 @@ func (v *mapConverter) Convert(ctx context.Context, typ attr.Type) (attr.Value, 
 		return basetypes.NewStringValue(v.String()), nil
 	case "basetypes.ObjectType":
 		atys := make(map[string]attr.Type, len(v.Elements()))
-		for k, _ := range v.Elements() {
+		for k := range v.Elements() {
 			atys[k] = v.ElementType(ctx)
 		}
 
