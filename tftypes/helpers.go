@@ -54,7 +54,13 @@ func IgnoreDiagnostics[T any](v T, _ diag.Diagnostics) T {
 // DiagnosticsToError converts a Diagnostics object into an error.
 func DiagnosticsToError[T any](v T, ds diag.Diagnostics) (T, error) {
 	if ds.HasError() {
-		return v, fmt.Errorf("%s: %s (and %d more errors)", ds[0].Severity(), ds[0].Detail(), len(ds))
+		for _, d := range ds {
+			if d.Severity() == diag.SeverityError {
+				return v, fmt.Errorf("%s: %s (and %d more errors)", d.Severity(), d.Detail(), len(ds))
+			}
+		}
+
+		return v, fmt.Errorf("no error diagnostic")
 	}
 
 	return v, nil
