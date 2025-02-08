@@ -41,15 +41,12 @@ var (
 func FromTfValue(ctx context.Context, v attr.Value, js *goja.Runtime) (goja.Value, error) {
 	ty := v.Type(ctx)
 
-	_, isObjectType := ty.(basetypes.ObjectType)
-	_, isMapType := ty.(basetypes.MapType)
-
 	switch {
 	case v.IsUnknown():
 		return nil, ErrUnknownValue
 	case v.IsNull():
 		return goja.Null(), nil
-	case isObjectType || isMapType:
+	case tftypes.IsObjectType(ty) || tftypes.IsMapType(ty):
 		return fromTfValueObject(ctx, v, js)
 	default:
 		raw, err := fromTfValueReflect(ctx, v, js)
@@ -63,7 +60,8 @@ func FromTfValue(ctx context.Context, v attr.Value, js *goja.Runtime) (goja.Valu
 func fromTfValueReflect(ctx context.Context, v attr.Value, js *goja.Runtime) (any, error) {
 	ty := v.Type(ctx)
 
-	if _, ok := ty.(basetypes.DynamicType); ok {
+	switch tftypes.PlainTypeString(ty) {
+	case "basetypes.DynamicType":
 		return fromTfValueReflect(
 			ctx,
 			tftypes.EnsurePointer(
@@ -71,26 +69,32 @@ func fromTfValueReflect(ctx context.Context, v attr.Value, js *goja.Runtime) (an
 			),
 			js,
 		)
-	}
-
-	if _, ok := ty.(basetypes.BoolType); ok {
+	case "basetypes.BoolType":
 		return tftypes.EnsurePointer(v).(*basetypes.BoolValue).ValueBool(), nil
-	}
-
-	if _, ok := ty.(basetypes.StringType); ok {
-		return tftypes.EnsurePointer(v).(*basetypes.StringValue).ValueString(), nil
-	}
-
-	if _, ok := ty.(basetypes.NumberType); ok {
+	case "basetypes.NumberType":
 		raw := tftypes.EnsurePointer(v).(*basetypes.NumberValue).ValueBigFloat()
 		if rawInt64, acc := raw.Int64(); acc == big.Exact {
 			return rawInt64, nil
 		}
 		rawFloat, _ := raw.Float64()
 		return rawFloat, nil
-	}
+	case "basetypes.StringType":
+		return tftypes.EnsurePointer(v).(*basetypes.StringValue).ValueString(), nil
+	case "basetypes.TupleType":
+		vv := tftypes.EnsurePointer(v).(*basetypes.TupleValue)
 
-	if _, ok := ty.(basetypes.ListType); ok {
+		raw := make([]any, 0, len(vv.Elements()))
+		for i, el := range vv.Elements() {
+			gojaV, err := FromTfValue(ctx, el, js)
+			if err != nil {
+				return nil, fmt.Errorf("%w: tuple[%d]: %w", ErrConversionFailure, i, err)
+			}
+
+			raw = append(raw, gojaV)
+		}
+
+		return raw, nil
+	case "basetypes.ListType":
 		vv := tftypes.EnsurePointer(v).(*basetypes.ListValue)
 
 		raw := make([]any, 0, len(vv.Elements()))
@@ -104,9 +108,7 @@ func fromTfValueReflect(ctx context.Context, v attr.Value, js *goja.Runtime) (an
 		}
 
 		return raw, nil
-	}
-
-	if _, ok := ty.(basetypes.SetType); ok {
+	case "basetypes.SetType":
 		vv := tftypes.EnsurePointer(v).(*basetypes.SetValue)
 
 		raw := make([]any, 0, len(vv.Elements()))
@@ -114,22 +116,6 @@ func fromTfValueReflect(ctx context.Context, v attr.Value, js *goja.Runtime) (an
 			gojaV, err := FromTfValue(ctx, el, js)
 			if err != nil {
 				return nil, fmt.Errorf("%w: set[%d]: %w", ErrConversionFailure, i, err)
-			}
-
-			raw = append(raw, gojaV)
-		}
-
-		return raw, nil
-	}
-
-	if _, ok := ty.(basetypes.TupleType); ok {
-		vv := tftypes.EnsurePointer(v).(*basetypes.TupleValue)
-
-		raw := make([]any, 0, len(vv.Elements()))
-		for i, el := range vv.Elements() {
-			gojaV, err := FromTfValue(ctx, el, js)
-			if err != nil {
-				return nil, fmt.Errorf("%w: tuple[%d]: %w", ErrConversionFailure, i, err)
 			}
 
 			raw = append(raw, gojaV)
@@ -146,10 +132,10 @@ func fromTfValueObject(ctx context.Context, v attr.Value, js *goja.Runtime) (*go
 
 	var attrs map[string]attr.Value
 	var typ string
-	if _, ok := ty.(basetypes.ObjectType); ok {
+	if tftypes.IsObjectType(ty) {
 		attrs = tftypes.EnsurePointer(v).(*basetypes.ObjectValue).Attributes()
 		typ = "object"
-	} else if _, ok := ty.(basetypes.MapType); ok {
+	} else if tftypes.IsMapType(ty) {
 		attrs = tftypes.EnsurePointer(v).(*basetypes.MapValue).Elements()
 		typ = "map"
 	} else {
