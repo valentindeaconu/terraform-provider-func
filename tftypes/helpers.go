@@ -27,6 +27,25 @@ func EnsurePointer(v attr.Value) attr.Value {
 	return ptr.Interface().(attr.Value)
 }
 
+// EnsureTypePointer makes sure that the underlying implementation
+// of an attr.Type is a pointer.
+func EnsureTypePointer(t attr.Type) attr.Type {
+	rv := reflect.ValueOf(t)
+
+	if t == nil {
+		return t
+	}
+
+	if rv.Kind() == reflect.Ptr {
+		return t
+	}
+
+	ptr := reflect.New(rv.Type())
+	ptr.Elem().Set(rv)
+
+	return ptr.Interface().(attr.Type)
+}
+
 // CollapseTypes accepts a slice of types and returns a single type
 // if all elements of the slice are of the same type.
 func CollapseTypes(tys []attr.Type) (attr.Type, error) {
