@@ -7,12 +7,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"terraform-provider-func/internal/javascript"
 	"terraform-provider-func/internal/runtime"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/function"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -21,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/ssoroka/slice"
+	"golang.org/x/exp/maps"
 )
 
 // Ensure FuncProvider satisfies various provider interfaces.
@@ -32,11 +35,13 @@ var _ provider.ProviderWithEphemeralResources = &FuncProvider{}
 type FuncProvider struct {
 	version string
 	vms     map[string]runtime.Runtime
+	parsed  map[string]struct{}
 }
 
 // FuncProviderModel describes the provider data model.
 type FuncProviderModel struct {
-	Library types.List `tfsdk:"library"`
+	CachePath types.String `tfsdk:"cache_path"`
+	Library   types.List   `tfsdk:"library"`
 }
 
 // LibraryModel describes the library data model.
@@ -45,11 +50,15 @@ type LibraryModel struct {
 }
 
 func (p *FuncProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
+	tflog.Trace(ctx, "Initiating metadata")
+
 	resp.TypeName = "func"
 	resp.Version = p.version
 }
 
 func (p *FuncProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
+	tflog.Trace(ctx, "Initiating schema")
+
 	resp.Schema = schema.Schema{
 		Description: "Bringing functional programming into Terraform.",
 		MarkdownDescription: strings.Join(
@@ -60,6 +69,20 @@ func (p *FuncProvider) Schema(ctx context.Context, req provider.SchemaRequest, r
 			},
 			" ",
 		),
+		Attributes: map[string]schema.Attribute{
+			"cache_path": schema.StringAttribute{
+				Description: "Path to the local cache directory.",
+				MarkdownDescription: strings.Join(
+					[]string{
+						"Path to the local cache directory.",
+						"If not set, it defaults to `$XDG_CACHE_HOME/func/libraries`.",
+						"Can also be set via an environment variable `FUNC_CACHE_PATH`.",
+					},
+					" ",
+				),
+				Optional: true,
+			},
+		},
 		Blocks: map[string]schema.Block{
 			"library": schema.ListNestedBlock{
 				MarkdownDescription: "Configuration for the functions library.",
@@ -89,43 +112,81 @@ func (p *FuncProvider) Schema(ctx context.Context, req provider.SchemaRequest, r
 }
 
 func (p *FuncProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	// var data FuncProviderModel
-	// var libs []LibraryModel = []LibraryModel{}
+	tflog.Trace(ctx, "Initiating configuration")
 
-	// resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-	// resp.Diagnostics.Append(data.Library.ElementsAs(ctx, &libs, false)...)
+	var data FuncProviderModel
 
-	// if resp.Diagnostics.HasError() {
-	// 	return
-	// }
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "could not get provider configuration", map[string]any{
+			"error": formatDiagnostics(resp.Diagnostics).Error(),
+		})
+		return
+	}
 
-	// resp.Diagnostics.AddWarning("found library files", fmt.Sprintf("%v %T", libs, libs))
+	paths, diags := FindLibrariesInModel(&data, true)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "could not find libraries in configuration", map[string]any{
+			"error": formatDiagnostics(resp.Diagnostics).Error(),
+		})
+		return
+	}
 
-	// for _, lib := range libs {
-	// 	resp.Diagnostics.AddWarning("parsing library file", fmt.Sprintf("%v %T", lib, lib))
+	for _, path := range paths {
+		if _, ok := p.parsed[path]; ok {
+			// This path was already parsed once.
+			tflog.Debug(ctx, "library already indexed", map[string]any{
+				"path": path,
+			})
+			continue
+		}
 
-	// 	content, err := os.ReadFile(lib.File.ValueString())
-	// 	if err != nil {
-	// 		resp.Diagnostics.AddError("could not read library file", err.Error())
-	// 		return
-	// 	}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			resp.Diagnostics.AddWarning("Cannot read file.", err.Error())
+			tflog.Warn(ctx, "Cannot read library", map[string]any{
+				"path":  path,
+				"error": err.Error(),
+			})
+			continue
+		}
 
-	// 	// TODO: Based on the file extension OR static input, determine the runtime
-	// 	vmKey := "js"
-	// 	vm, ok := p.vms[vmKey]
-	// 	if !ok {
-	// 		resp.Diagnostics.AddError(
-	// 			"cannot parse library",
-	// 			fmt.Errorf("cannot parse %s (key %s), no parser implementation for it", lib.File.String(), vmKey).Error(),
-	// 		)
-	// 		return
-	// 	}
+		vmKey := filepath.Ext(path)
+		vm, ok := p.vms[vmKey]
+		if !ok {
+			resp.Diagnostics.AddWarning(
+				"Cannot parse library.",
+				fmt.Sprintf("There is no parser that can parse '.%s' files (source '%s').", vmKey, path),
+			)
+			tflog.Warn(ctx, "Cannot parse library", map[string]any{
+				"path":  path,
+				"vm":    vmKey,
+				"error": "no VM can parse this library",
+			})
+			continue
+		}
 
-	// 	if err := vm.Parse(string(content)); err != nil {
-	// 		resp.Diagnostics.AddError("library parsing failed", err.Error())
-	// 		return
-	// 	}
-	// }
+		if err := vm.Parse(string(content)); err != nil {
+			resp.Diagnostics.AddWarning(
+				"Library is unparsable.",
+				fmt.Sprintf("Built-in VM could not parse library '%s': %v.", path, err.Error()),
+			)
+			tflog.Warn(ctx, "The vm could not parse this library", map[string]any{
+				"path":  path,
+				"vm":    vmKey,
+				"error": err.Error(),
+			})
+			continue
+		}
+
+		p.parsed[path] = struct{}{}
+
+		tflog.Info(ctx, "Successfully indexed library", map[string]any{
+			"path": path,
+			"vm":   vmKey,
+		})
+	}
 
 	funcs := make(map[string]runtime.Function, 0)
 
@@ -135,18 +196,29 @@ func (p *FuncProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 		}
 	}
 
+	tflog.Info(ctx, "Provider indexed functions", map[string]any{
+		"count": len(funcs),
+		"names": maps.Keys(funcs),
+	})
+
 	resp.DataSourceData = funcs
 }
 
 func (p *FuncProvider) Resources(ctx context.Context) []func() resource.Resource {
+	tflog.Trace(ctx, "Exposing resources")
+
 	return []func() resource.Resource{}
 }
 
 func (p *FuncProvider) EphemeralResources(ctx context.Context) []func() ephemeral.EphemeralResource {
+	tflog.Trace(ctx, "Exposing ephemeral resources")
+
 	return []func() ephemeral.EphemeralResource{}
 }
 
 func (p *FuncProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
+	tflog.Trace(ctx, "Exposing data sources")
+
 	return []func() datasource.DataSource{
 		func() datasource.DataSource {
 			return &DataSource{}
@@ -155,11 +227,20 @@ func (p *FuncProvider) DataSources(ctx context.Context) []func() datasource.Data
 }
 
 func (p *FuncProvider) Functions(ctx context.Context) []func() function.Function {
+	tflog.Trace(ctx, "Exposing functions")
+
 	funcs := make([]runtime.Function, 0)
 
 	for _, runtime := range p.vms {
 		funcs = append(funcs, runtime.Functions()...)
 	}
+
+	tflog.Info(ctx, "Provider indexed functions", map[string]any{
+		"count": len(funcs),
+		"names": slice.Map[runtime.Function, string](funcs, func(f runtime.Function) string {
+			return f.Name()
+		}),
+	})
 
 	return slice.Map[runtime.Function, func() function.Function](
 		funcs,
@@ -172,39 +253,84 @@ func (p *FuncProvider) Functions(ctx context.Context) []func() function.Function
 }
 
 func New(version string) func() provider.Provider {
+	logger := newFileLogger()
+
 	vms := map[string]runtime.Runtime{
 		"js": javascript.New(),
 		// "go": golang.New(),
 	}
 
-	for _, v := range os.Environ() {
-		if strings.HasPrefix(v, "FUNC_LIBRARY_") && strings.HasSuffix(v, "_SOURCE") {
-			file := strings.SplitN(v, "=", 2)
+	parsed := make(map[string]struct{})
 
-			// TODO: Implement getter support
-			content, err := os.ReadFile(file[1])
-			if err != nil {
-				tflog.Error(context.TODO(), fmt.Sprintf("ignored file %v: %v", file, err))
-				continue
-			}
+	diags := diag.Diagnostics{}
 
-			// TODO: Based on the file extension OR static input, determine the runtime
-			vmKey := "js"
-			vm, ok := vms[vmKey]
-			if !ok {
-				panic(fmt.Errorf("cannot parse %s (key %s), no parser implementation for it", file[1], vmKey))
-			}
-
-			if err := vm.Parse(string(content)); err != nil {
-				panic(err)
-			}
-		}
+	paths, ds := FindLibrariesInEnvironment(true)
+	if ds.HasError() {
+		logger.Error(formatDiagnostics(ds).Error(), "diagnostics", ds)
+		return nil
 	}
+
+	for _, path := range paths {
+		if _, ok := parsed[path]; ok {
+			// This path was already parsed once.
+			logger.Debug("skipping already parsed library", "library", path)
+			continue
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			logger.Warn("cannot read file", "error", err)
+			diags.AddWarning("Cannot read file.", err.Error())
+			continue
+		}
+
+		vmKey := strings.TrimPrefix(filepath.Ext(path), ".")
+		vm, ok := vms[vmKey]
+		if !ok {
+			logger.Warn("no parser for file", "parser", vmKey, "path", path)
+			diags.AddWarning(
+				"Cannot parse library.",
+				fmt.Sprintf("There is no parser that can parse '.%s' files (source '%s').", vmKey, path),
+			)
+			continue
+		}
+
+		if err := vm.Parse(string(content)); err != nil {
+			logger.Warn("unparsable library", "parser", vmKey, "path", path, "error", err.Error())
+			diags.AddWarning(
+				"Library is unparsable.",
+				fmt.Sprintf("Built-in VM could not parse library '%s': %v.", path, err.Error()),
+			)
+			continue
+		}
+
+		logger.Info("successfully parsed library", "path", path)
+		parsed[path] = struct{}{}
+	}
+
+	if diags.HasError() {
+		logger.Error(formatDiagnostics(ds).Error(), "diagnostics", ds)
+		return nil
+	}
+
+	logger.Info("all libraries were successfully indexed", "vms", maps.Keys(vms), "parsed", maps.Keys(parsed))
 
 	return func() provider.Provider {
 		return &FuncProvider{
 			version: version,
 			vms:     vms,
+			parsed:  parsed,
 		}
 	}
+}
+
+// formatDiagnostics converts a list of diagnostics into a single error
+func formatDiagnostics(ds diag.Diagnostics) error {
+	for _, d := range ds {
+		if d.Severity() == diag.SeverityError {
+			return fmt.Errorf("%s: %s (and %d more errors)", d.Severity(), d.Detail(), ds.ErrorsCount())
+		}
+	}
+
+	return fmt.Errorf("no error diagnostic")
 }

@@ -11,7 +11,7 @@ For now, the provider is still in the state of the art phase.
 Features - completed, work-in-progress or planned (in no specific order):
 - [x] Dynamic functions generation;
 - [x] JavaScript support (via goja);
-- [ ] Getter integration;
+- [x] Getter integration;
 - [x] JSDoc integration;
 - [ ] GoLang support;
 - [ ] Provider configuration;
