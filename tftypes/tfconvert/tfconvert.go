@@ -66,7 +66,7 @@ func (v *boolConverter) Convert(ctx context.Context, typ attr.Type) (attr.Value,
 	case "basetypes.StringType":
 		return basetypes.NewStringValue(map[bool]string{false: "false", true: "true"}[v.ValueBool()]), nil
 	default:
-		return nil, fmt.Errorf("could not convert boolean into %v", typ.String())
+		return nil, fmt.Errorf("could not convert %v into %v", v.Type(ctx).String(), typ.String())
 	}
 }
 
@@ -86,7 +86,7 @@ func (v *numberConverter) Convert(ctx context.Context, typ attr.Type) (attr.Valu
 	case "basetypes.StringType":
 		return basetypes.NewStringValue(v.ValueBigFloat().String()), nil
 	default:
-		return nil, fmt.Errorf("could not convert number into %v", typ.String())
+		return nil, fmt.Errorf("could not convert %v into %v", v.Type(ctx).String(), typ.String())
 	}
 }
 
@@ -99,7 +99,7 @@ func (v *stringConverter) Convert(ctx context.Context, typ attr.Type) (attr.Valu
 	case "basetypes.StringType":
 		return basetypes.NewStringValue(v.String()), nil
 	default:
-		return nil, fmt.Errorf("could not convert string into %v", typ.String())
+		return nil, fmt.Errorf("could not convert %v into %v", v.Type(ctx).String(), typ.String())
 	}
 }
 
@@ -118,6 +118,42 @@ func (v *tupleConverter) Convert(ctx context.Context, typ attr.Type) (attr.Value
 		}
 
 		return tftypes.DiagnosticsToError(basetypes.NewListValue(cty, v.Elements()))
+	case "basetypes.TupleType":
+		target := tftypes.EnsureTypePointer(typ).(*basetypes.TupleType).ElementTypes()
+		current := v.ElementTypes(ctx)
+
+		if len(target) != len(current) {
+			return nil, fmt.Errorf("cannot convert to tuple type with fewer elements than the existing one")
+		}
+
+		hasDiff := false
+		for i := range current {
+			if !current[i].Equal(target[i]) {
+				hasDiff = true
+				break
+			}
+		}
+
+		if !hasDiff {
+			return v.TupleValue, nil
+		}
+
+		currentElements := v.Elements()
+		convertedElements := make([]attr.Value, len(target))
+		for i := range current {
+			if current[i].Equal(target[i]) {
+				convertedElements[i] = currentElements[i]
+			} else {
+				val, err := Convert(ctx, currentElements[i], target[i])
+				if err != nil {
+					return nil, fmt.Errorf("cannot convert tuple index '%d': %v", i, err)
+				}
+
+				convertedElements[i] = val
+			}
+		}
+
+		return tftypes.DiagnosticsToError(basetypes.NewTupleValue(target, convertedElements))
 	case "basetypes.SetType":
 		cty, err := tftypes.CollapseTypes(v.ElementTypes(ctx))
 		if err != nil {
@@ -126,7 +162,7 @@ func (v *tupleConverter) Convert(ctx context.Context, typ attr.Type) (attr.Value
 
 		return tftypes.DiagnosticsToError(basetypes.NewSetValue(cty, v.Elements()))
 	default:
-		return nil, fmt.Errorf("could not convert string into %v", typ.String())
+		return nil, fmt.Errorf("could not convert %v into %v", v.Type(ctx).String(), typ.String())
 	}
 }
 
@@ -138,6 +174,23 @@ func (v *listConverter) Convert(ctx context.Context, typ attr.Type) (attr.Value,
 	switch tftypes.PlainTypeString(typ) {
 	case "basetypes.StringType":
 		return basetypes.NewStringValue(v.String()), nil
+	case "basetypes.ListType":
+		target := tftypes.EnsureTypePointer(typ).(*basetypes.ListType).ElementType()
+		if v.ElementType(ctx).Equal(target) {
+			return v.ListValue, nil
+		}
+
+		convertedElements := make([]attr.Value, len(v.Elements()))
+		for i, value := range v.Elements() {
+			convertedValue, err := Convert(ctx, value, target)
+			if err != nil {
+				return nil, fmt.Errorf("cannot convert list index %d: %v", i, err)
+			}
+
+			convertedElements[i] = convertedValue
+		}
+
+		return tftypes.DiagnosticsToError(basetypes.NewListValue(typ, convertedElements))
 	case "basetypes.TupleType":
 		tys := make([]attr.Type, len(v.Elements()))
 		for range v.Elements() {
@@ -146,7 +199,7 @@ func (v *listConverter) Convert(ctx context.Context, typ attr.Type) (attr.Value,
 
 		return tftypes.DiagnosticsToError(basetypes.NewTupleValue(tys, v.Elements()))
 	default:
-		return nil, fmt.Errorf("could not convert list into %v", typ.String())
+		return nil, fmt.Errorf("could not convert %v into %v", v.Type(ctx).String(), typ.String())
 	}
 }
 
@@ -167,8 +220,25 @@ func (v *setConverter) Convert(ctx context.Context, typ attr.Type) (attr.Value, 
 		}
 
 		return tftypes.DiagnosticsToError(basetypes.NewTupleValue(tys, v.Elements()))
+	case "basetypes.SetType":
+		target := tftypes.EnsureTypePointer(typ).(*basetypes.SetType).ElementType()
+		if v.ElementType(ctx).Equal(target) {
+			return v.SetValue, nil
+		}
+
+		convertedElements := make([]attr.Value, len(v.Elements()))
+		for i, value := range v.Elements() {
+			convertedValue, err := Convert(ctx, value, target)
+			if err != nil {
+				return nil, fmt.Errorf("cannot convert set index %d (value %s): %v", i, value.String(), err)
+			}
+
+			convertedElements[i] = convertedValue
+		}
+
+		return tftypes.DiagnosticsToError(basetypes.NewSetValue(typ, convertedElements))
 	default:
-		return nil, fmt.Errorf("could not convert set into %v", typ.String())
+		return nil, fmt.Errorf("could not convert %v into %v", v.Type(ctx).String(), typ.String())
 	}
 }
 
@@ -180,6 +250,54 @@ func (v *objectConverter) Convert(ctx context.Context, typ attr.Type) (attr.Valu
 	switch tftypes.PlainTypeString(typ) {
 	case "basetypes.StringType":
 		return basetypes.NewStringValue(v.String()), nil
+	case "basetypes.ObjectType":
+		target := tftypes.EnsureTypePointer(typ).(*basetypes.ObjectType).AttributeTypes()
+		current := v.AttributeTypes(ctx)
+
+		if len(target) != len(current) {
+			return nil, fmt.Errorf("cannot convert to object type with fewer keys than the existing one")
+		}
+
+		for k := range current {
+			if _, ok := target[k]; !ok {
+				return nil, fmt.Errorf("target type is missing the '%s' key", k)
+			}
+		}
+
+		// No need to check if a target key is not in current because
+		// we already checked the length of the maps and at this point,
+		// they are equal, so if the length check passes and all the
+		// keys of current are in target, we can assume they both
+		// share the same keys.
+
+		hasDiff := false
+		for k := range current {
+			if !current[k].Equal(target[k]) {
+				hasDiff = true
+				break
+			}
+		}
+
+		if !hasDiff {
+			return v.ObjectValue, nil
+		}
+
+		currentAttributes := v.Attributes()
+		convertedAttributes := make(map[string]attr.Value, len(target))
+		for k := range current {
+			if current[k].Equal(target[k]) {
+				convertedAttributes[k] = currentAttributes[k]
+			} else {
+				val, err := Convert(ctx, currentAttributes[k], target[k])
+				if err != nil {
+					return nil, fmt.Errorf("cannot convert object key '%s': %v", k, err)
+				}
+
+				convertedAttributes[k] = val
+			}
+		}
+
+		return tftypes.DiagnosticsToError(basetypes.NewObjectValue(target, convertedAttributes))
 	case "basetypes.MapType":
 		cty, err := tftypes.CollapseTypes(maps.Values(v.AttributeTypes(ctx)))
 		if err != nil {
@@ -188,7 +306,7 @@ func (v *objectConverter) Convert(ctx context.Context, typ attr.Type) (attr.Valu
 
 		return tftypes.DiagnosticsToError(basetypes.NewMapValue(cty, v.Attributes()))
 	default:
-		return nil, fmt.Errorf("could not convert object into %v", typ.String())
+		return nil, fmt.Errorf("could not convert %v into %v", v.Type(ctx).String(), typ.String())
 	}
 }
 
@@ -207,7 +325,24 @@ func (v *mapConverter) Convert(ctx context.Context, typ attr.Type) (attr.Value, 
 		}
 
 		return tftypes.DiagnosticsToError(basetypes.NewObjectValue(atys, v.Elements()))
+	case "basetypes.MapType":
+		target := tftypes.EnsureTypePointer(typ).(*basetypes.MapType).ElementType()
+		if v.ElementType(ctx).Equal(target) {
+			return v.MapValue, nil
+		}
+
+		convertedElements := make(map[string]attr.Value, len(v.Elements()))
+		for key, value := range v.Elements() {
+			convertedValue, err := Convert(ctx, value, target)
+			if err != nil {
+				return nil, fmt.Errorf("cannot convert map key '%s': %v", key, err)
+			}
+
+			convertedElements[key] = convertedValue
+		}
+
+		return tftypes.DiagnosticsToError(basetypes.NewMapValue(typ, convertedElements))
 	default:
-		return nil, fmt.Errorf("could not map set into %v", typ.String())
+		return nil, fmt.Errorf("could not convert %v into %v", v.Type(ctx).String(), typ.String())
 	}
 }
