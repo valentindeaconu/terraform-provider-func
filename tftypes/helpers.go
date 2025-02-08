@@ -37,7 +37,7 @@ func CollapseTypes(tys []attr.Type) (attr.Type, error) {
 			continue
 		}
 
-		if !ty.Equal(cty) {
+		if !TypeEqual(ty, cty) {
 			return nil, fmt.Errorf("all elements must be of the same type (%v =/= %v)", cty, ty)
 		}
 	}

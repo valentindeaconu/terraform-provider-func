@@ -100,3 +100,43 @@ func PlainTypeString(ty attr.Type) string {
 
 	return "basetypes.DynamicType"
 }
+
+// TypeEqual checks if two types are equal.
+//
+// Compared with the built-in Equal method, this method also returns
+// true, if one of the types is pointer and the other one not.
+func TypeEqual(lhs attr.Type, rhs attr.Type) bool {
+	if IsBoolType(lhs) && IsBoolType(rhs) {
+		return true
+	}
+
+	if IsNumberType(lhs) && IsNumberType(rhs) {
+		return true
+	}
+
+	if IsStringType(lhs) && IsStringType(rhs) {
+		return true
+	}
+
+	if IsTupleType(lhs) && IsTupleType(rhs) {
+		return true
+	}
+
+	if IsListType(lhs) && IsListType(rhs) {
+		return true
+	}
+
+	if IsSetType(lhs) && IsSetType(rhs) {
+		return true
+	}
+
+	if IsObjectType(lhs) && IsObjectType(rhs) {
+		return true
+	}
+
+	if IsMapType(lhs) && IsMapType(rhs) {
+		return true
+	}
+
+	return false
+}
