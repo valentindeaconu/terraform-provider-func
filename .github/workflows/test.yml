@@ -54,7 +54,7 @@ jobs:
 
   # Run acceptance tests in a matrix with Terraform CLI versions
   test:
-    name: Terraform Provider Acceptance Tests
+    name: Provider Tests
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -78,7 +78,11 @@ jobs:
           terraform_version: ${{ matrix.terraform }}
           terraform_wrapper: false
       - run: go mod download
-      - env:
+      - name: Unit Tests
+        run: go test -v -cover -parallel=10 `go list ./... | grep -v -F -- 'internal/provider'`
+        timeout-minutes: 10
+      - name: Acceptance Tests
+        env:
           TF_ACC: "1"
         run: go test -v -cover ./internal/provider/
         timeout-minutes: 10
