@@ -149,7 +149,7 @@ func (d *DataSource) Read(ctx context.Context, req datasource.ReadRequest, resp 
 	val := data.Inputs.UnderlyingValue()
 	valTy := val.Type(ctx)
 	if tftypes.IsObjectType(valTy) {
-		obj := tftypes.EnsurePointer(val).(*basetypes.ObjectValue)
+		obj := tftypes.EnsurePointer(val).(*basetypes.ObjectValue) //nolint:forcetypeassert
 
 		for k, v := range obj.Attributes() {
 			pos := -1
@@ -187,7 +187,7 @@ func (d *DataSource) Read(ctx context.Context, req datasource.ReadRequest, resp 
 			args[pos] = v
 		}
 	} else if tftypes.IsTupleType(valTy) {
-		tuple := tftypes.EnsurePointer(val).(*basetypes.TupleValue)
+		tuple := tftypes.EnsurePointer(val).(*basetypes.TupleValue) //nolint:forcetypeassert
 
 		for i, v := range tuple.Elements() {
 			if !params[i].GetType().Equal(v.Type(ctx)) {
@@ -245,7 +245,7 @@ func (d *DataSource) Read(ctx context.Context, req datasource.ReadRequest, resp 
 		return
 	}
 
-	resVal := res.(attr.Value)
+	resVal := res.(attr.Value) //nolint:forcetypeassert
 	if !ret.GetType().Equal(resVal.Type(ctx)) {
 		convertedVal, err := tfconvert.Convert(ctx, resVal, ret.GetType())
 		if err != nil {

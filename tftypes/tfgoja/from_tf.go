@@ -65,23 +65,23 @@ func fromTfValueReflect(ctx context.Context, v attr.Value, js *goja.Runtime) (an
 		return fromTfValueReflect(
 			ctx,
 			tftypes.EnsurePointer(
-				tftypes.EnsurePointer(v).(*basetypes.DynamicValue).UnderlyingValue(),
+				tftypes.EnsurePointer(v).(*basetypes.DynamicValue).UnderlyingValue(), //nolint:forcetypeassert
 			),
 			js,
 		)
 	case "basetypes.BoolType":
-		return tftypes.EnsurePointer(v).(*basetypes.BoolValue).ValueBool(), nil
+		return tftypes.EnsurePointer(v).(*basetypes.BoolValue).ValueBool(), nil //nolint:forcetypeassert
 	case "basetypes.NumberType":
-		raw := tftypes.EnsurePointer(v).(*basetypes.NumberValue).ValueBigFloat()
+		raw := tftypes.EnsurePointer(v).(*basetypes.NumberValue).ValueBigFloat() //nolint:forcetypeassert
 		if rawInt64, acc := raw.Int64(); acc == big.Exact {
 			return rawInt64, nil
 		}
 		rawFloat, _ := raw.Float64()
 		return rawFloat, nil
 	case "basetypes.StringType":
-		return tftypes.EnsurePointer(v).(*basetypes.StringValue).ValueString(), nil
+		return tftypes.EnsurePointer(v).(*basetypes.StringValue).ValueString(), nil //nolint:forcetypeassert
 	case "basetypes.TupleType":
-		vv := tftypes.EnsurePointer(v).(*basetypes.TupleValue)
+		vv := tftypes.EnsurePointer(v).(*basetypes.TupleValue) //nolint:forcetypeassert
 
 		raw := make([]any, 0, len(vv.Elements()))
 		for i, el := range vv.Elements() {
@@ -95,7 +95,7 @@ func fromTfValueReflect(ctx context.Context, v attr.Value, js *goja.Runtime) (an
 
 		return raw, nil
 	case "basetypes.ListType":
-		vv := tftypes.EnsurePointer(v).(*basetypes.ListValue)
+		vv := tftypes.EnsurePointer(v).(*basetypes.ListValue) //nolint:forcetypeassert
 
 		raw := make([]any, 0, len(vv.Elements()))
 		for i, el := range vv.Elements() {
@@ -109,7 +109,7 @@ func fromTfValueReflect(ctx context.Context, v attr.Value, js *goja.Runtime) (an
 
 		return raw, nil
 	case "basetypes.SetType":
-		vv := tftypes.EnsurePointer(v).(*basetypes.SetValue)
+		vv := tftypes.EnsurePointer(v).(*basetypes.SetValue) //nolint:forcetypeassert
 
 		raw := make([]any, 0, len(vv.Elements()))
 		for i, el := range vv.Elements() {
@@ -133,10 +133,10 @@ func fromTfValueObject(ctx context.Context, v attr.Value, js *goja.Runtime) (*go
 	var attrs map[string]attr.Value
 	var typ string
 	if tftypes.IsObjectType(ty) {
-		attrs = tftypes.EnsurePointer(v).(*basetypes.ObjectValue).Attributes()
+		attrs = tftypes.EnsurePointer(v).(*basetypes.ObjectValue).Attributes() //nolint:forcetypeassert
 		typ = "object"
 	} else if tftypes.IsMapType(ty) {
-		attrs = tftypes.EnsurePointer(v).(*basetypes.MapValue).Elements()
+		attrs = tftypes.EnsurePointer(v).(*basetypes.MapValue).Elements() //nolint:forcetypeassert
 		typ = "map"
 	} else {
 		return nil, fmt.Errorf("%w: '%v' should be map or object, but it is not", ErrUnknownType, ty)
@@ -149,7 +149,9 @@ func fromTfValueObject(ctx context.Context, v attr.Value, js *goja.Runtime) (*go
 			return nil, fmt.Errorf("%w: %s[%s]: %w", ErrConversionFailure, typ, k, err)
 		}
 
-		ret.DefineDataProperty(k, gojaV, goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE)
+		if err := ret.DefineDataProperty(k, gojaV, goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE); err != nil {
+			return nil, err
+		}
 	}
 
 	return ret, nil

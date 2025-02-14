@@ -50,7 +50,7 @@ func AsTerraformParameter(typ attr.Type, name string, in *ParameterOptions) (fun
 		return nil, fmt.Errorf("tuples cannot be configured as function parameters")
 	case "basetypes.ListType":
 		return &function.ListParameter{
-			ElementType:         typ.(*basetypes.ListType).ElemType,
+			ElementType:         typ.(*basetypes.ListType).ElemType, //nolint:forcetypeassert
 			AllowNullValue:      true,
 			AllowUnknownValues:  false,
 			Name:                name,
@@ -59,7 +59,7 @@ func AsTerraformParameter(typ attr.Type, name string, in *ParameterOptions) (fun
 		}, nil
 	case "basetypes.SetType":
 		return &function.SetParameter{
-			ElementType:         typ.(*basetypes.SetType).ElemType,
+			ElementType:         typ.(*basetypes.SetType).ElemType, //nolint:forcetypeassert
 			AllowNullValue:      true,
 			AllowUnknownValues:  false,
 			Name:                name,
@@ -68,7 +68,7 @@ func AsTerraformParameter(typ attr.Type, name string, in *ParameterOptions) (fun
 		}, nil
 	case "basetypes.ObjectType":
 		return &function.ObjectParameter{
-			AttributeTypes:      typ.(*basetypes.ObjectType).AttrTypes,
+			AttributeTypes:      typ.(*basetypes.ObjectType).AttrTypes, //nolint:forcetypeassert
 			AllowNullValue:      true,
 			AllowUnknownValues:  false,
 			Name:                name,
@@ -77,7 +77,7 @@ func AsTerraformParameter(typ attr.Type, name string, in *ParameterOptions) (fun
 		}, nil
 	case "basetypes.MapType":
 		return &function.MapParameter{
-			ElementType:         typ.(*basetypes.MapType).ElemType,
+			ElementType:         typ.(*basetypes.MapType).ElemType, //nolint:forcetypeassert
 			AllowNullValue:      true,
 			AllowUnknownValues:  false,
 			Name:                name,
@@ -111,19 +111,19 @@ func AsTerraformReturn(typ attr.Type) (function.Return, error) {
 		return nil, fmt.Errorf("tuples cannot be configured as function return")
 	case "basetypes.ListType":
 		return &function.ListReturn{
-			ElementType: typ.(*basetypes.ListType).ElemType,
+			ElementType: typ.(*basetypes.ListType).ElemType, //nolint:forcetypeassert
 		}, nil
 	case "basetypes.SetType":
 		return &function.SetReturn{
-			ElementType: typ.(*basetypes.SetType).ElemType,
+			ElementType: typ.(*basetypes.SetType).ElemType, //nolint:forcetypeassert
 		}, nil
 	case "basetypes.ObjectType":
 		return &function.ObjectReturn{
-			AttributeTypes: typ.(*basetypes.ObjectType).AttrTypes,
+			AttributeTypes: typ.(*basetypes.ObjectType).AttrTypes, //nolint:forcetypeassert
 		}, nil
 	case "basetypes.MapType":
 		return &function.MapReturn{
-			ElementType: typ.(*basetypes.MapType).ElemType,
+			ElementType: typ.(*basetypes.MapType).ElemType, //nolint:forcetypeassert
 		}, nil
 	default:
 		break

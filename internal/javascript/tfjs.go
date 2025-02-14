@@ -10,18 +10,14 @@ import (
 )
 
 var (
-	// objectTypeRegExp = regexp.MustCompile(`(?:(\w+)|\[([\w]+)\s*:\s*([\w]+)\])\s*:\s*({(?:[^{}]|\n|(?:{(?:[^{}]|\n)*}))*}|[\w\[\]{}|]+)\s*;`)
 	objectTypeRegExp = regexp.MustCompile(`(?:(\w+)|\[(\w+)\s*:\s*(\w+)\])\s*:\s*({[^}]*}|[\w\[\]{}|]+)\s*;`)
-
-	tfDynamicType = &basetypes.DynamicType{}
 )
 
-// getTerraformType converts a JavaScript (TypeScript) type into
-// a Terraform type
+// getTerraformType converts a JavaScript (TypeScript) type into a Terraform type.
 //
 // Complex types are not 100% covered.
 // It will return an error if a type that doesn't have an equivalent
-// in Terraform is parsed
+// in Terraform is parsed.
 func getTerraformType(tys string) (attr.Type, error) {
 	// Unions
 	if strings.Contains(tys, "|") {

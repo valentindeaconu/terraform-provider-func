@@ -17,7 +17,7 @@ type ConverterFrom interface {
 	Convert(context.Context, attr.Type) (attr.Value, error)
 }
 
-// Convert tries to convert a value to a given type
+// Convert tries to convert a value to a given type.
 func Convert(ctx context.Context, val attr.Value, typ attr.Type) (attr.Value, error) {
 	ty := val.Type(ctx)
 
@@ -35,21 +35,21 @@ func Convert(ctx context.Context, val attr.Value, typ attr.Type) (attr.Value, er
 	// Anything else, convert them if possible
 	switch tftypes.PlainTypeString(ty) {
 	case "basetypes.BoolType":
-		return (&boolConverter{tftypes.EnsurePointer(val).(*basetypes.BoolValue)}).Convert(ctx, typ)
+		return (&boolConverter{tftypes.EnsurePointer(val).(*basetypes.BoolValue)}).Convert(ctx, typ) //nolint:forcetypeassert
 	case "basetypes.NumberType":
-		return (&numberConverter{tftypes.EnsurePointer(val).(*basetypes.NumberValue)}).Convert(ctx, typ)
+		return (&numberConverter{tftypes.EnsurePointer(val).(*basetypes.NumberValue)}).Convert(ctx, typ) //nolint:forcetypeassert
 	case "basetypes.StringType":
-		return (&stringConverter{tftypes.EnsurePointer(val).(*basetypes.StringValue)}).Convert(ctx, typ)
+		return (&stringConverter{tftypes.EnsurePointer(val).(*basetypes.StringValue)}).Convert(ctx, typ) //nolint:forcetypeassert
 	case "basetypes.TupleType":
-		return (&tupleConverter{tftypes.EnsurePointer(val).(*basetypes.TupleValue)}).Convert(ctx, typ)
+		return (&tupleConverter{tftypes.EnsurePointer(val).(*basetypes.TupleValue)}).Convert(ctx, typ) //nolint:forcetypeassert
 	case "basetypes.ListType":
-		return (&listConverter{tftypes.EnsurePointer(val).(*basetypes.ListValue)}).Convert(ctx, typ)
+		return (&listConverter{tftypes.EnsurePointer(val).(*basetypes.ListValue)}).Convert(ctx, typ) //nolint:forcetypeassert
 	case "basetypes.SetType":
-		return (&setConverter{tftypes.EnsurePointer(val).(*basetypes.SetValue)}).Convert(ctx, typ)
+		return (&setConverter{tftypes.EnsurePointer(val).(*basetypes.SetValue)}).Convert(ctx, typ) //nolint:forcetypeassert
 	case "basetypes.ObjectType":
-		return (&objectConverter{tftypes.EnsurePointer(val).(*basetypes.ObjectValue)}).Convert(ctx, typ)
+		return (&objectConverter{tftypes.EnsurePointer(val).(*basetypes.ObjectValue)}).Convert(ctx, typ) //nolint:forcetypeassert
 	case "basetypes.MapType":
-		return (&mapConverter{tftypes.EnsurePointer(val).(*basetypes.MapValue)}).Convert(ctx, typ)
+		return (&mapConverter{tftypes.EnsurePointer(val).(*basetypes.MapValue)}).Convert(ctx, typ) //nolint:forcetypeassert
 	}
 
 	return nil, fmt.Errorf("don't know how to convert %s into %s", ty, typ)
@@ -119,7 +119,7 @@ func (v *tupleConverter) Convert(ctx context.Context, typ attr.Type) (attr.Value
 
 		return tftypes.DiagnosticsToError(basetypes.NewListValue(cty, v.Elements()))
 	case "basetypes.TupleType":
-		target := tftypes.EnsureTypePointer(typ).(*basetypes.TupleType).ElementTypes()
+		target := tftypes.EnsureTypePointer(typ).(*basetypes.TupleType).ElementTypes() //nolint:forcetypeassert
 		current := v.ElementTypes(ctx)
 
 		if len(target) != len(current) {
@@ -175,7 +175,7 @@ func (v *listConverter) Convert(ctx context.Context, typ attr.Type) (attr.Value,
 	case "basetypes.StringType":
 		return basetypes.NewStringValue(v.String()), nil
 	case "basetypes.ListType":
-		target := tftypes.EnsureTypePointer(typ).(*basetypes.ListType).ElementType()
+		target := tftypes.EnsureTypePointer(typ).(*basetypes.ListType).ElementType() //nolint:forcetypeassert
 		if v.ElementType(ctx).Equal(target) {
 			return v.ListValue, nil
 		}
@@ -193,8 +193,8 @@ func (v *listConverter) Convert(ctx context.Context, typ attr.Type) (attr.Value,
 		return tftypes.DiagnosticsToError(basetypes.NewListValue(typ, convertedElements))
 	case "basetypes.TupleType":
 		tys := make([]attr.Type, len(v.Elements()))
-		for range v.Elements() {
-			tys = append(tys, v.ElementType(ctx))
+		for i := range v.Elements() {
+			tys[i] = v.ElementType(ctx)
 		}
 
 		return tftypes.DiagnosticsToError(basetypes.NewTupleValue(tys, v.Elements()))
@@ -215,13 +215,13 @@ func (v *setConverter) Convert(ctx context.Context, typ attr.Type) (attr.Value, 
 		return tftypes.DiagnosticsToError(basetypes.NewListValue(v.ElementType(ctx), v.Elements()))
 	case "basetypes.TupleType":
 		tys := make([]attr.Type, len(v.Elements()))
-		for range v.Elements() {
-			tys = append(tys, v.ElementType(ctx))
+		for i := range v.Elements() {
+			tys[i] = v.ElementType(ctx)
 		}
 
 		return tftypes.DiagnosticsToError(basetypes.NewTupleValue(tys, v.Elements()))
 	case "basetypes.SetType":
-		target := tftypes.EnsureTypePointer(typ).(*basetypes.SetType).ElementType()
+		target := tftypes.EnsureTypePointer(typ).(*basetypes.SetType).ElementType() //nolint:forcetypeassert
 		if v.ElementType(ctx).Equal(target) {
 			return v.SetValue, nil
 		}
@@ -251,7 +251,7 @@ func (v *objectConverter) Convert(ctx context.Context, typ attr.Type) (attr.Valu
 	case "basetypes.StringType":
 		return basetypes.NewStringValue(v.String()), nil
 	case "basetypes.ObjectType":
-		target := tftypes.EnsureTypePointer(typ).(*basetypes.ObjectType).AttributeTypes()
+		target := tftypes.EnsureTypePointer(typ).(*basetypes.ObjectType).AttributeTypes() //nolint:forcetypeassert
 		current := v.AttributeTypes(ctx)
 
 		if len(target) != len(current) {
@@ -326,7 +326,7 @@ func (v *mapConverter) Convert(ctx context.Context, typ attr.Type) (attr.Value, 
 
 		return tftypes.DiagnosticsToError(basetypes.NewObjectValue(atys, v.Elements()))
 	case "basetypes.MapType":
-		target := tftypes.EnsureTypePointer(typ).(*basetypes.MapType).ElementType()
+		target := tftypes.EnsureTypePointer(typ).(*basetypes.MapType).ElementType() //nolint:forcetypeassert
 		if v.ElementType(ctx).Equal(target) {
 			return v.MapValue, nil
 		}

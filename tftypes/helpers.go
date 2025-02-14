@@ -24,7 +24,7 @@ func EnsurePointer(v attr.Value) attr.Value {
 	ptr := reflect.New(rv.Type())
 	ptr.Elem().Set(rv)
 
-	return ptr.Interface().(attr.Value)
+	return ptr.Interface().(attr.Value) //nolint:forcetypeassert
 }
 
 // EnsureTypePointer makes sure that the underlying implementation
@@ -43,7 +43,7 @@ func EnsureTypePointer(t attr.Type) attr.Type {
 	ptr := reflect.New(rv.Type())
 	ptr.Elem().Set(rv)
 
-	return ptr.Interface().(attr.Type)
+	return ptr.Interface().(attr.Type) //nolint:forcetypeassert
 }
 
 // CollapseTypes accepts a slice of types and returns a single type

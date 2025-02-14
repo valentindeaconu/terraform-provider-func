@@ -68,9 +68,14 @@ func ToTfValue(ctx context.Context, v goja.Value, js *goja.Runtime) (attr.Value,
 	}
 
 	if _, ok := ty.(basetypes.ObjectType); ok {
+		obj, ok := value.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("exported object is not a map, but %T", value)
+		}
+
 		builder := dynamicstruct.NewStruct()
 
-		for k, v := range v.Export().(map[string]any) {
+		for k, v := range obj {
 			builder.AddField(
 				// We need to title the key to comply with GoLang struct exporting
 				cases.Title(language.English, cases.Compact).String(k),
