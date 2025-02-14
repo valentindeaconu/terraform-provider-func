@@ -171,7 +171,9 @@ func TestFromTfValue(t *testing.T) {
 				t.Errorf("conversion errored: %s", err.Error())
 			}
 
-			testJS.Set("v", got)
+			if err := testJS.Set("v", got); err != nil {
+				t.Errorf("could not set value: %s", err.Error())
+			}
 
 			if _, err := testJS.RunString(test.test); err != nil {
 				gotObj := got.ToObject(testJS)

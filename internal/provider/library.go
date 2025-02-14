@@ -50,7 +50,7 @@ func FindLibrariesInEnvironment(optimistic bool) ([]string, diag.Diagnostics) {
 	ctx := context.Background()
 	diags := diag.Diagnostics{}
 
-	var fetchDst string = ""
+	fetchDst := ""
 	if path, ok := os.LookupEnv("FUNC_CACHE_PATH"); ok {
 		fetchDst = path
 	} else if cacheDir, err := getDefaultCacheFolderPath(); err != nil {
@@ -145,7 +145,7 @@ func FindLibrariesInModel(model *FuncProviderModel, optimistic bool) ([]string, 
 		return nil, diags
 	}
 
-	var fetchDst string = ""
+	fetchDst := ""
 	if !model.CachePath.IsNull() && !model.CachePath.IsUnknown() {
 		fetchDst = model.CachePath.ValueString()
 	} else if cacheDir, err := getDefaultCacheFolderPath(); err != nil {

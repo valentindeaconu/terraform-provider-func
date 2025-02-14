@@ -14,12 +14,12 @@ import (
 	"github.com/ssoroka/slice"
 )
 
-// Test that the JavaScriptFunction correctly implements the Function interface
+// Test that the JavaScriptFunction correctly implements the Function interface.
 var (
 	_ runtime.Function = &JavaScriptFunction{}
 )
 
-// JavaScriptArgument holds the metadata regarding a JS argument
+// JavaScriptArgument holds the metadata regarding a JS argument.
 type JavaScriptArgument struct {
 	name        string
 	description string
@@ -92,7 +92,7 @@ type javascriptFunctionInput struct {
 	callable    goja.Callable
 }
 
-// NewJavaScriptFunction creates a new JavaScriptFunction
+// NewJavaScriptFunction creates a new JavaScriptFunction.
 func NewJavaScriptFunction(in *javascriptFunctionInput, runtime *goja.Runtime) (*JavaScriptFunction, error) {
 	if in == nil {
 		return nil, fmt.Errorf("input cannot be nil")
@@ -155,7 +155,7 @@ func bindCallableToRuntime(runtime *goja.Runtime, callable goja.Callable) runtim
 		gojaArgs := make([]goja.Value, len(args))
 
 		for i, arg := range args {
-			res, err := tfgoja.FromTfValue(ctx, arg.(attr.Value), runtime)
+			res, err := tfgoja.FromTfValue(ctx, arg.(attr.Value), runtime) //nolint:forcetypeassert
 			if err != nil {
 				return nil, fmt.Errorf("argument %d cannot be converted to Terraform: %w", i, err)
 			}

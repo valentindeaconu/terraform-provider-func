@@ -17,20 +17,20 @@ var (
 	wsRegEx               = regexp.MustCompile(`\s+`)
 )
 
-// javaScriptArgumentMetadata holds metadata for a JavaScript argument
+// javaScriptArgumentMetadata holds metadata for a JavaScript argument.
 type javaScriptArgumentMetadata struct {
 	name        string
 	typ         string
 	description string
 }
 
-// javaScriptReturnMetadata holds metadata for a JavaScript return
+// javaScriptReturnMetadata holds metadata for a JavaScript return.
 type javaScriptReturnMetadata struct {
 	typ         string
 	description string
 }
 
-// JavaScriptFunctionMetadata holds metadata for a JavaScript function
+// JavaScriptFunctionMetadata holds metadata for a JavaScript function.
 type JavaScriptFunctionMetadata struct {
 	summary     string
 	description string
@@ -38,7 +38,7 @@ type JavaScriptFunctionMetadata struct {
 	returns     *javaScriptReturnMetadata
 }
 
-// parseScriptJSDoc parses JSDoc from a JavaScript script file
+// parseScriptJSDoc parses JSDoc from a JavaScript script file.
 func parseScriptJSDoc(src string) (map[string]*JavaScriptFunctionMetadata, error) {
 	matches := jsdocRegEx.FindAllStringSubmatch(src, -1)
 
@@ -61,7 +61,7 @@ func parseScriptJSDoc(src string) (map[string]*JavaScriptFunctionMetadata, error
 	return res, nil
 }
 
-// parseJSDoc parses a JSDoc string
+// parseJSDoc parses a JSDoc string.
 func parseJSDoc(doc string) (*JavaScriptFunctionMetadata, error) {
 	lines := strings.Split(doc, "\n")
 
@@ -157,10 +157,10 @@ func regExFindAndDelete(re *regexp.Regexp, s string, putback string) (string, st
 	return strings.TrimSpace(match[1]), re.ReplaceAllString(s, putback)
 }
 
-// removeWhitespaceFromString removes any whitespace character from a
-// given string, keeping everything else as it is.
+// removeWhitespaceFromString removes any whitespace character from
+// a given string keeping everything else as it is.
 //
-// Example: "this is an example" => "thisisanexample"
+// Example: "this is an example" => "thisisanexample".
 func removeWhitespaceFromString(s string) string {
 	return wsRegEx.ReplaceAllString(s, "")
 }

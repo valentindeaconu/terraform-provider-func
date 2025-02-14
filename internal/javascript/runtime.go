@@ -24,7 +24,7 @@ type JavaScriptRuntime struct {
 	funcs        map[string]*JavaScriptFunction
 }
 
-// New creates a new JavaScriptRuntime
+// New creates a new JavaScriptRuntime.
 func New() runtime.Runtime {
 	vm := goja.New()
 

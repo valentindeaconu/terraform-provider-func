@@ -324,7 +324,7 @@ func New(version string) func() provider.Provider {
 	}
 }
 
-// formatDiagnostics converts a list of diagnostics into a single error
+// formatDiagnostics converts a list of diagnostics into a single error.
 func formatDiagnostics(ds diag.Diagnostics) error {
 	for _, d := range ds {
 		if d.Severity() == diag.SeverityError {

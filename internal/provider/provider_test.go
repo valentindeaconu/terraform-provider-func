@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -19,7 +18,8 @@ func TestFuncProvider(t *testing.T) {
 	// Configure the library to test
 	_, filename, _, _ := runtime.Caller(0)
 	dirname := filepath.Dir(filename)
-	os.Setenv("FUNC_LIBRARY_TEST01_SOURCE", filepath.Join(dirname, "provider_test_library.js"))
+
+	t.Setenv("FUNC_LIBRARY_TEST01_SOURCE", filepath.Join(dirname, "provider_test_library.js"))
 
 	t.Parallel()
 

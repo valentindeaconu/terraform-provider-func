@@ -8,10 +8,10 @@ import (
 	tffunc "github.com/hashicorp/terraform-plugin-framework/function"
 )
 
-// Callable represent the bound function signature
+// Callable represent the bound function signature.
 type Callable = func(args ...any) (any, error)
 
-// Function is an abstract interface representing a function
+// Function is an abstract interface representing a function.
 type Function interface {
 	// Name returns the function name
 	// It should be formatted as snake case to align with Terraform values, but it is not required.
@@ -95,7 +95,7 @@ func (r TerraformFunction) Run(ctx context.Context, req tffunc.RunRequest, resp 
 		return
 	}
 
-	val, err := tfconvert.Convert(ctx, res.(attr.Value), rty.GetType())
+	val, err := tfconvert.Convert(ctx, res.(attr.Value), rty.GetType()) //nolint:forcetypeassert
 	if err != nil {
 		resp.Error = tffunc.ConcatFuncErrors(resp.Error, tffunc.NewFuncError(err.Error()))
 		return
