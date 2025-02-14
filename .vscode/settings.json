@@ -1,3 +1,9 @@
 {
-  "terraform.languageServer.enable": false,
+
+  "go.lintTool": "golangci-lint",
+  "go.lintFlags": [
+    "--fast"
+  ],
+
+  "terraform.languageServer.enable": true,
 }
