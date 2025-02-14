@@ -61,7 +61,7 @@ func TestFromTfValue(t *testing.T) {
 			for (k in v) {
 				keys.push(k);
 			}
-			if (keys.length != 2 || keys[0] != 'name' || keys[1] != 'foo')
+			if (keys.length != 2 || !keys.includes('name') || !keys.includes('foo'))
 				throw new Error('wrong keys')
 			`,
 		},
