@@ -1,0 +1,47 @@
+# {{ .Name }} ({{ .Type }})
+
+{{ .Description }}
+
+## Example Usage
+
+For the given function declaration:
+
+```javascript
+/**
+ * Adds two numbers together.
+ *
+ * @param {number} a - The first number.
+ * @param {number} b - The second number.
+ * @returns {number} The sum of `a` and `b`.
+ */
+$(function sum(a, b) {
+  return a + b;
+})
+```
+
+You can use data-sources to call the function:
+
+```terraform
+data "{{ .Name }}" "sum_numbers_args" {
+  id     = "sum"
+  inputs = [10, 32]
+}
+
+output "sum_numbers_args_result" {
+  value = data.{{ .Name }}.sum_numbers_args.result
+}
+
+data "{{ .Name }}" "sum_numbers_kwargs" {
+  id = "sum"
+  inputs = {
+    a = 10
+    b = 32
+  }
+}
+
+output "sum_numbers_kwargs_result" {
+  value = data.{{ .Name }}.sum_numbers_kwargs.result
+}
+```
+
+{{ .SchemaMarkdown }}
