@@ -1,34 +1,90 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package provider
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
-	"github.com/hashicorp/terraform-plugin-testing/echoprovider"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
+	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 )
 
-// testAccProtoV6ProviderFactories is used to instantiate a provider during acceptance testing.
-// The factory function is called for each Terraform CLI command to create a provider
-// server that the CLI can connect to and interact with.
-var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
-	"func": providerserver.NewProtocol6WithError(New("test")()),
-}
+func TestFuncProvider(t *testing.T) {
+	// Configure the library to test
+	_, filename, _, _ := runtime.Caller(0)
+	dirname := filepath.Dir(filename)
+	os.Setenv("FUNC_LIBRARY_TEST01_SOURCE", filepath.Join(dirname, "provider_test_library.js"))
 
-// testAccProtoV6ProviderFactoriesWithEcho includes the echo provider alongside the func provider.
-// It allows for testing assertions on data returned by an ephemeral resource during Open.
-// The echoprovider is used to arrange tests by echoing ephemeral data into the Terraform state.
-// This lets the data be referenced in test assertions with state checks.
-var testAccProtoV6ProviderFactoriesWithEcho = map[string]func() (tfprotov6.ProviderServer, error){
-	"func": providerserver.NewProtocol6WithError(New("test")()),
-	"echo": echoprovider.NewProviderServer(),
-}
+	t.Parallel()
 
-func testAccPreCheck(t *testing.T) {
-	// You can add code here to run prior to any test case execution, for example assertions
-	// about the appropriate environment variables being set are common to see in a pre-check
-	// function.
+	resource.UnitTest(t, resource.TestCase{
+		TerraformVersionChecks: []tfversion.TerraformVersionCheck{
+			tfversion.SkipBelow(tfversion.Version1_0_0), // func provider is protocol version 6
+		},
+		ProtoV6ProviderFactories: map[string]func() (tfprotov6.ProviderServer, error){
+			"func": providerserver.NewProtocol6WithError(New("test")()),
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: `
+				provider "func" {}
+
+				data "func" "sum" {
+					id = "sum"
+
+					inputs = [100, 100]
+				}
+				`,
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("data.func.sum", tfjsonpath.New("result"), knownvalue.Float64Exact(200)),
+				},
+			},
+			{
+				Config: `
+				provider "func" {}
+
+				data "func" "create_object" {
+					id = "create_object"
+
+					inputs = {
+						name = "John"
+						age  = 35
+					}
+				}
+				`,
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("data.func.create_object", tfjsonpath.New("result"), knownvalue.ObjectExact(map[string]knownvalue.Check{
+						"name": knownvalue.StringExact("John"),
+						"age":  knownvalue.Float64Exact(35),
+					})),
+				},
+			},
+		},
+	})
+
+	resource.UnitTest(t, resource.TestCase{
+		TerraformVersionChecks: []tfversion.TerraformVersionCheck{
+			tfversion.SkipBelow(tfversion.Version1_8_0), // func provider is protocol version 6, but functions were only added in v1.8
+		},
+		ProtoV6ProviderFactories: map[string]func() (tfprotov6.ProviderServer, error){
+			"func": providerserver.NewProtocol6WithError(New("test")()),
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: `
+				output "test" {
+					value = provider::func::concat("pineapple", "pen")
+				}`,
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownOutputValue("test", knownvalue.StringExact("pineapplepen")),
+				},
+			},
+		},
+	})
 }
