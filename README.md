@@ -13,9 +13,10 @@ Features - completed, work-in-progress or planned (in no specific order):
 - [x] JavaScript support (via goja);
 - [x] Getter integration;
 - [x] JSDoc integration;
-- [ ] GoLang support;
-- [ ] Provider configuration;
 - [x] Terraform <1.8 support via data-sources.
+- [ ] GoLang support;
+- [ ] Native provider configuration (requires Terraform support);
+- [ ] Functions namespaces;
 
 ## Features
 
@@ -68,11 +69,11 @@ The func provider will look up for all environment variables that have the `FUNC
 
 ### Remote libraries
 
-The func provider integrates with go-getter, so you can fetch your libraries at runtime from any remote source, using the exact same sources you will provide for your modules.
+The func provider integrates go-getter under the hood, so you can fetch your libraries at runtime from any remote source, using the exact same sources you will provide for your modules.
 
 ### Terraform Language-server support
 
-By annotating your functions with JSDoc descriptions, the func provider will gather those comments and communicate them to the language-server, so you can see what you are doing directly from your IDE.
+By annotating your functions with descriptions (JSDoc for JavaScript), the func provider will gather those comments and communicate them to the language-server, so you can see what you are doing directly from your IDE.
 
 ### Multiple runtimes
 
