@@ -17,7 +17,7 @@ Considering the following `library.js` file:
  * @param {number} b - The second number.
  * @returns {number} The sum of `a` and `b`.
  */
-$(function sum(a, b) {
+$$(function sum(a, b) {
   return a + b;
 })
 
@@ -30,7 +30,7 @@ $(function sum(a, b) {
  * @param {number} b - The second number.
  * @returns {number} The smaller of `a` and `b`.
  */
-$(function min(a, b) {
+$$(function min(a, b) {
   return a > b ? b : a;
 })
 
@@ -43,7 +43,7 @@ $(function min(a, b) {
  * @param {string} b - The second string.
  * @returns {string} The concatenated string.
  */
-$(function concat(a, b) {
+$$(function concat(a, b) {
   return a + b;
 })
 
@@ -56,7 +56,7 @@ $(function concat(a, b) {
  * @param {string[]} b - The second array.
  * @returns {string[]} A new array containing elements of `a` followed by elements of `b`.
  */
-$(function extend(a, b) {
+$$(function extend(a, b) {
   return a.concat(b);
 })
 
@@ -69,7 +69,7 @@ $(function extend(a, b) {
  * @param {number} age - The age of the person.
  * @returns {{name: string; age: number;}} An object with two attributes, name and age.
  */
-$(function create_object(name, age) {
+$$(function create_object(name, age) {
   return { name, age };
 })
 ```
@@ -87,7 +87,7 @@ terraform {
 
 provider "func" {
   library {
-    source = "file://${path.module}/library.js"
+    source = "file://$${path.module}/library.js"
   }
 }
 
