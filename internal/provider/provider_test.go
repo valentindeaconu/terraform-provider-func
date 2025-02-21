@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,10 +20,11 @@ func TestFuncProvider(t *testing.T) {
 	// Configure the library to test
 	_, filename, _, _ := runtime.Caller(0)
 	dirname := filepath.Dir(filename)
+	libPath := filepath.Join(dirname, "provider_test_library.js")
 
 	// Cannot use t.Setenv with t.Parallel
 	//nolint:tenv
-	os.Setenv("FUNC_LIBRARY_TEST01_SOURCE", filepath.Join(dirname, "provider_test_library.js"))
+	os.Setenv("FUNC_LIBRARY_TEST01_SOURCE", libPath)
 
 	t.Parallel()
 
@@ -35,22 +37,30 @@ func TestFuncProvider(t *testing.T) {
 		},
 		Steps: []resource.TestStep{
 			{
-				Config: `
-				provider "func" {}
+				Config: fmt.Sprintf(`
+				provider "func" {
+					library {
+						source = "%s"
+					}
+				}
 
 				data "func" "sum" {
 					id = "sum"
 
 					inputs = [100, 100]
 				}
-				`,
+				`, libPath),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue("data.func.sum", tfjsonpath.New("result"), knownvalue.Float64Exact(200)),
 				},
 			},
 			{
-				Config: `
-				provider "func" {}
+				Config: fmt.Sprintf(`
+				provider "func" {
+					library {
+						source = "%s"
+					}
+				}
 
 				data "func" "create_object" {
 					id = "create_object"
@@ -60,7 +70,7 @@ func TestFuncProvider(t *testing.T) {
 						age  = 35
 					}
 				}
-				`,
+				`, libPath),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue("data.func.create_object", tfjsonpath.New("result"), knownvalue.ObjectExact(map[string]knownvalue.Check{
 						"name": knownvalue.StringExact("John"),
@@ -80,10 +90,16 @@ func TestFuncProvider(t *testing.T) {
 		},
 		Steps: []resource.TestStep{
 			{
-				Config: `
+				Config: fmt.Sprintf(`
+				provider "func" {
+					library {
+						source = "%s"
+					}
+				}
+
 				output "test" {
 					value = provider::func::concat("pineapple", "pen")
-				}`,
+				}`, libPath),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownOutputValue("test", knownvalue.StringExact("pineapplepen")),
 				},
