@@ -117,5 +117,6 @@ jobs:
         env:
           TF_ACC: "1"
           TF_TOOL: ${{ matrix.tool }}
+          TF_ACC_PROVIDER_HOST: ${{ matrix.tool == 'opentofu' && 'registry.opentofu.org' || 'registry.terraform.io' }}
         run: go test -v -cover ./internal/provider/
         timeout-minutes: 10
