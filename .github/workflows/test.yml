@@ -105,12 +105,10 @@ jobs:
         with:
           tofu_version: ${{ matrix.version }}
           tofu_wrapper: false
-      - if: ${{ matrix.tool == 'opentofu' }}
-        run: |
-          mkdir -p $HOME/.local/bin
-          echo '#!/bin/bash\ntofu $@' > $HOME/.local/bin/terraform
-          chmod +x $HOME/.local/bin/terraform
-          echo "PATH=$HOME/.local/bin:$PATH" >> $GITHUB_ENV
+        # https://github.com/hashicorp/terraform-plugin-testing/blob/d69a9b74619565f5bb15733cc26e2a1af3e28506/internal/plugintest/environment_variables.go#L94
+      - name: Patch TF_ACC_TERRAFORM_PATH
+        if: ${{ matrix.tool == 'opentofu' }}
+        run: echo "TF_ACC_TERRAFORM_PATH=$(which tofu)" >> $GITHUB_ENV
       - run: go mod download
       - name: Unit Tests
         run: go test -v -cover -parallel=10 `go list ./... | grep -v -F -- 'internal/provider'`
