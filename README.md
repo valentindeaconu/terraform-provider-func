@@ -49,16 +49,19 @@ You can now define libraries of functions alongside your infrastructure code.
         }
       }
     }
-
-    # This is not yet supported by Terraform.
-    # You can achieve this by setting the  environment variable.
-    provider "func" {
-      # You can either declare the library as code here,
-      # or set it via an environment variable: FUNC_LIBRARY_{ID}_SOURCE="file:///abs/path/to/the/lib.js"
-      library {
-        source = "file://${path.module}/lib.js"
-      }
-    }
+   
+   /* 
+    * The following is the eventual goal. However, it is NOT yet supported by Terraform because 
+    * it expects the provider to share the functions supported before analyzing the configuration.
+    * For now, you will need to use environment variables to add your libraries.
+    * Example: FUNC_LIBRARY_{ID}_SOURCE="file:///abs/path/to/the/lib.js"
+    * 
+    * provider "func" {
+    *     library {
+    *         source = "file://${path.module}/lib.js"
+    *     }
+    * }
+    */
     ```
 5. Use the function:
    ```hcl
